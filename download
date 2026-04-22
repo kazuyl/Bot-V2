@@ -1,0 +1,18 @@
+import requests
+
+url = 'http://localhost:5000/webhook'
+payload = {
+    'secret': 'my_super_secret_key',
+    'model': 'aggr_pullback',
+    'side': 'long',
+    'ticker': 'NQ1!',
+    'time': 'demo',
+    'entry': 27000,
+    'stop': 26980,
+    'tp': 27040,
+    'market_state': 'bull_trend',
+}
+
+r = requests.post(url, json=payload)
+print(r.status_code)
+print(r.text)
