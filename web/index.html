@@ -3,12 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TradingView Bot Dashboard</title>
+  <title>Trading Bot Dashboard Pro</title>
   <style>
     :root {
       --bg: #0b1020;
-      --panel: #121932;
-      --panel-2: #0f152b;
+      --bg-2: #0f1730;
+      --panel: rgba(18, 25, 50, 0.92);
+      --panel-2: rgba(15, 21, 43, 0.92);
       --text: #edf2ff;
       --muted: #99a3c7;
       --line: rgba(255,255,255,0.08);
@@ -16,45 +17,129 @@
       --red: #ff5c5c;
       --yellow: #f5c451;
       --blue: #63a4ff;
-      --shadow: 0 10px 30px rgba(0,0,0,0.25);
+      --purple: #b388ff;
+      --shadow: 0 14px 40px rgba(0,0,0,0.28);
       --radius: 20px;
     }
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: Inter, Arial, sans-serif; background: radial-gradient(circle at top, #172042 0%, var(--bg) 48%); color: var(--text); }
-    .wrap { max-width: 1400px; margin: 0 auto; padding: 28px; }
-    .topbar { display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:20px; }
-    .card { background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; }
-    .grid { display:grid; grid-template-columns: 1.1fr 0.9fr; gap:18px; }
+    body {
+      margin: 0;
+      font-family: Inter, Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(99,164,255,0.18), transparent 30%),
+        radial-gradient(circle at top right, rgba(179,136,255,0.12), transparent 25%),
+        linear-gradient(180deg, var(--bg-2), var(--bg));
+      min-height: 100vh;
+    }
+    .wrap { max-width: 1450px; margin: 0 auto; padding: 28px; }
+    .topbar { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; margin-bottom:20px; }
+    .title h1 { margin:0; font-size: 34px; }
+    .title p { margin:8px 0 0; color:var(--muted); }
+    .status-pill {
+      padding: 12px 16px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--line);
+      font-size: 13px;
+    }
+    .card {
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+      backdrop-filter: blur(8px);
+    }
+    .mb { margin-bottom: 18px; }
+    .grid { display:grid; grid-template-columns: 1.2fr 0.8fr; gap:18px; }
     .stack { display:grid; gap:18px; }
     .row { display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; }
-    .kv { background: rgba(255,255,255,0.035); border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
+    .kv {
+      background: rgba(255,255,255,0.035);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+    }
     .kv .label { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
-    .kv .value { font-size: 22px; font-weight: 700; }
-    .pill { padding: 10px 14px; border: 1px solid var(--line); background: rgba(255,255,255,0.04); border-radius: 999px; font-size: 13px; }
-    .badge { display:inline-block; padding:8px 12px; border-radius:999px; font-size:13px; margin-right:8px; }
-    .green { background: rgba(46, 204, 113, 0.12); color:#9ff0bf; }
-    .red { background: rgba(255, 92, 92, 0.12); color:#ffb0b0; }
-    .yellow { background: rgba(245, 196, 81, 0.12); color:#ffe4a3; }
-    .list { display:grid; gap:12px; }
-    .item { padding:12px; border:1px solid var(--line); border-radius:16px; background: rgba(255,255,255,0.025); }
+    .kv .value { font-size: 24px; font-weight: 800; }
     .muted { color: var(--muted); }
-    input { width: 100%; padding: 12px; border-radius: 12px; border:1px solid var(--line); background:#0f152b; color:var(--text); }
-    button { padding: 12px 16px; border-radius: 12px; border:none; cursor:pointer; }
+    .badge {
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 12px;
+      border-radius:999px;
+      font-size:13px;
+      border:1px solid transparent;
+    }
+    .green { background: rgba(46,204,113,.12); color:#9ff0bf; border-color: rgba(46,204,113,.25); }
+    .red { background: rgba(255,92,92,.12); color:#ffb0b0; border-color: rgba(255,92,92,.25); }
+    .yellow { background: rgba(245,196,81,.12); color:#ffe4a3; border-color: rgba(245,196,81,.25); }
+    .blue { background: rgba(99,164,255,.12); color:#bdd8ff; border-color: rgba(99,164,255,.25); }
+    input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border:1px solid var(--line);
+      background:#0f152b;
+      color:var(--text);
+      outline: none;
+    }
+    button {
+      padding: 12px 16px;
+      border-radius: 12px;
+      border:1px solid var(--line);
+      background:#172042;
+      color:var(--text);
+      cursor:pointer;
+      font-weight:600;
+    }
+    button:hover { filter: brightness(1.08); }
     .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
-    @media (max-width: 1000px) { .grid, .row { grid-template-columns: 1fr; } }
+    .list { display:grid; gap:12px; }
+    .item {
+      padding:12px 14px;
+      border:1px solid var(--line);
+      border-radius:16px;
+      background: rgba(255,255,255,0.025);
+    }
+    .item-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap: 8px 14px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .chart-shell {
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding: 14px;
+      background: rgba(255,255,255,0.02);
+    }
+    .chart-title { margin:0 0 10px; font-size:16px; }
+    .chart-wrap { height: 280px; }
+    .table-wrap {
+      border:1px solid var(--line);
+      border-radius:16px;
+      overflow:auto;
+      background: rgba(255,255,255,0.02);
+    }
+    table { width:100%; border-collapse: collapse; min-width: 700px; }
+    th, td { padding: 12px 14px; text-align:left; border-bottom:1px solid var(--line); font-size: 14px; }
+    th { color: var(--muted); font-weight: 600; position: sticky; top: 0; background: #121932; }
+    tr:last-child td { border-bottom: none; }
+    .positive { color: #9ff0bf; }
+    .negative { color: #ffb0b0; }
+    @media (max-width: 1100px) { .grid, .row { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="topbar">
-      <div>
-        <h1 style="margin:0">TradingView Bot Dashboard</h1>
-        <p class="muted" style="margin:8px 0 0">GitHub Pages friendly dashboard for your webhook + paper-trade engine</p>
+      <div class="title">
+        <h1>Trading Bot Dashboard</h1>
+        <p>Live dashboard for your webhook and paper trade engine</p>
       </div>
-      <div class="pill">Status: <span id="api-status">Waiting</span></div>
+      <div class="status-pill">API: <span id="api-status">Waiting</span></div>
     </div>
 
-    <div class="card" style="margin-bottom:18px">
+    <div class="card mb">
       <div class="muted" style="margin-bottom:8px">API Base URL</div>
       <input id="apiBase" value="https://disown-lavender-announcer.ngrok-free.dev" />
       <div class="actions">
@@ -82,8 +167,21 @@
         </div>
 
         <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+            <h2 style="margin:0">Equity Curve</h2>
+            <span class="muted">Built from recent closed trades</span>
+          </div>
+          <div class="chart-shell" style="margin-top:14px">
+            <h3 class="chart-title">Realized R Curve</h3>
+            <div class="chart-wrap">
+              <canvas id="equityChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
           <h2 style="margin-top:0">Open Position</h2>
-          <div id="open_position_badge"></div>
+          <div id="open_position_badge" style="margin-bottom:14px"></div>
           <div id="open_position" class="list"></div>
         </div>
       </div>
@@ -93,29 +191,103 @@
           <h2 style="margin-top:0">Recent Signals</h2>
           <div id="recent_signals" class="list"></div>
         </div>
+
         <div class="card">
-          <h2 style="margin-top:0">Recent Trades</h2>
-          <div id="recent_trades" class="list"></div>
+          <h2 style="margin-top:0">Trade History</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Model</th>
+                  <th>Side</th>
+                  <th>Result R</th>
+                  <th>PnL</th>
+                  <th>Exit</th>
+                </tr>
+              </thead>
+              <tbody id="trade_table_body"></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
+    let equityChart;
+
     function fmt(v, digits = 2) {
       if (v === null || v === undefined || Number.isNaN(Number(v))) return '-';
       return Number(v).toFixed(digits);
     }
+
     function text(id, value) {
       const el = document.getElementById(id);
       if (el) el.textContent = value;
     }
+
     function apiBase() {
       return document.getElementById('apiBase').value.replace(/\/$/, '');
     }
+
     function itemHtml(obj) {
-      return Object.entries(obj).filter(([k]) => k !== 'raw').map(([k, v]) => `<div><strong>${k}</strong>: <span class="muted">${v ?? '-'}</span></div>`).join('');
+      return `<div class="item-grid">${Object.entries(obj)
+        .filter(([k]) => k !== 'raw')
+        .map(([k, v]) => `<div><strong>${k}</strong><br><span class="muted mono">${v ?? '-'}</span></div>`)
+        .join('')}</div>`;
     }
+
+    function renderEquity(trades) {
+      const labels = [];
+      const values = [];
+      let equity = 0;
+      (trades || []).slice().reverse().forEach((t, i) => {
+        equity += Number(t.result_r || 0);
+        labels.push(String(i + 1));
+        values.push(Number(equity.toFixed(3)));
+      });
+
+      const ctx = document.getElementById('equityChart');
+      if (!ctx) return;
+
+      if (equityChart) equityChart.destroy();
+      equityChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Equity (R)',
+            data: values,
+            borderWidth: 2,
+            tension: 0.25,
+            pointRadius: 2,
+            fill: true,
+            backgroundColor: 'rgba(99,164,255,0.12)',
+            borderColor: 'rgba(99,164,255,1)'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: '#edf2ff' } }
+          },
+          scales: {
+            x: {
+              ticks: { color: '#99a3c7' },
+              grid: { color: 'rgba(255,255,255,0.06)' }
+            },
+            y: {
+              ticks: { color: '#99a3c7' },
+              grid: { color: 'rgba(255,255,255,0.06)' }
+            }
+          }
+        }
+      });
+    }
+
     async function loadData() {
       try {
         const res = await fetch(`${apiBase()}/dashboard_data`);
@@ -159,16 +331,27 @@
         });
         if (!sigs.innerHTML) sigs.innerHTML = '<div class="muted">No signals yet</div>';
 
-        const trades = document.getElementById('recent_trades');
+        const trades = document.getElementById('trade_table_body');
         trades.innerHTML = '';
         (data.recent_trades || []).forEach(t => {
-          const div = document.createElement('div');
-          div.className = 'item';
-          div.innerHTML = itemHtml(t);
-          trades.appendChild(div);
+          const tr = document.createElement('tr');
+          const rr = Number(t.result_r || 0);
+          const pnl = Number(t.pnl || 0);
+          tr.innerHTML = `
+            <td class="mono">${t.closed_at || '-'}</td>
+            <td>${t.model || '-'}</td>
+            <td>${t.side || '-'}</td>
+            <td class="${rr >= 0 ? 'positive' : 'negative'}">${fmt(rr, 3)}</td>
+            <td class="${pnl >= 0 ? 'positive' : 'negative'}">$${fmt(pnl, 2)}</td>
+            <td>${t.exit_reason || '-'}</td>
+          `;
+          trades.appendChild(tr);
         });
-        if (!trades.innerHTML) trades.innerHTML = '<div class="muted">No trades yet</div>';
+        if (!trades.innerHTML) {
+          trades.innerHTML = '<tr><td colspan="6" class="muted">No trades yet</td></tr>';
+        }
 
+        renderEquity(data.recent_trades || []);
       } catch (err) {
         text('api-status', 'Offline');
         console.error(err);
