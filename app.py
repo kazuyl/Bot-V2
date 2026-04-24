@@ -241,6 +241,7 @@ def webhook():
 
     try:
         data = request.get_json(silent=True)
+
         if data is None:
             return jsonify({"ok": False, "error": "No JSON received"}), 400
 
@@ -250,19 +251,14 @@ def webhook():
         action = data.get("action", "open")
 
         if action == "close":
-            global CURRENT_PRICE
-        
             price = data.get("price")
-        
+
             if price is None:
-                return jsonify({
-                    "ok": False,
-                    "error": "Close alert missing price",
-                }), 400
-        
+                return jsonify({"ok": False, "error": "Close alert missing price"}), 400
+
             close_price = float(price)
             CURRENT_PRICE = close_price
-        
+
             if not POSITION_OPEN or CURRENT_POSITION is None:
                 return jsonify({
                     "ok": True,
@@ -272,8 +268,57 @@ def webhook():
                     "current_position": None,
                 }), 200
 
-    reason = data.get("reason", "tradingview_close")
-    closed_trade = close_position(reason, close_price)
+            reason = data.get("reason", "tradingview_close")
+            closed_trade = close_position(reason, close_price)
+
+            return jsonify({
+                "ok": True,
+                "message": "Position closed by TradingView alert",
+                "closed_trade": closed_trade,
+                "current_price": CURRENT_PRICE,
+                "position_open": POSITION_OPEN,
+                "current_position": CURRENT_POSITION,
+            }), 200
+
+        ENGINE_STATE["signals_received"] += 1
+
+        entry_price = data.get("entry")
+
+        if entry_price is not None:
+            CURRENT_PRICE = float(entry_price)
+
+        if LAST_SIGNAL == data:
+            ENGINE_STATE["signals_ignored_duplicates"] += 1
+            write_json(STATE_FILE, ENGINE_STATE)
+            return jsonify({"ok": True, "duplicate": True}), 200
+
+        LAST_SIGNAL = data
+
+        if POSITION_OPEN:
+            ENGINE_STATE["signals_ignored_position_open"] += 1
+            write_json(STATE_FILE, ENGINE_STATE)
+            return jsonify({
+                "ok": True,
+                "ignored": True,
+                "reason": "position already open",
+            }), 200
+
+        signal = normalize_signal(data)
+        append_jsonl(LOG_FILE, signal)
+        accept_signal(signal)
+
+        return jsonify({
+            "ok": True,
+            "message": "Signal accepted",
+            "position_open": POSITION_OPEN,
+            "current_position": CURRENT_POSITION,
+            "current_price": CURRENT_PRICE,
+        }), 200
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+   
 
     return jsonify({
         "ok": True,
