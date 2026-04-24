@@ -219,7 +219,7 @@ def dashboard_data() -> Any:
 
 @app.route('/webhook', methods=['POST'])
 def webhook() -> Any:
-    global LAST_SIGNAL, ENGINE_STATE
+    global LAST_SIGNAL, ENGINE_STATE, CURRENT_PRICE
 
     try:
         data = request.get_json(silent=True)
@@ -230,6 +230,13 @@ def webhook() -> Any:
             return jsonify({'ok': False, 'error': 'Invalid secret'}), 403
 
         ENGINE_STATE['signals_received'] += 1
+        entry_price = data.get('entry')
+        if entry_price is not None:
+            try:
+                CURRENT_PRICE = float(entry_price)
+            except:
+                print("[WARN] could not parse entry price")
+        
 
         if LAST_SIGNAL == data:
             ENGINE_STATE['signals_ignored_duplicates'] += 1
