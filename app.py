@@ -247,6 +247,43 @@ def webhook():
         if data.get("secret") != WEBHOOK_SECRET:
             return jsonify({"ok": False, "error": "Invalid secret"}), 403
 
+        action = data.get("action", "open")
+
+        if action == "close":
+            global CURRENT_PRICE
+        
+            price = data.get("price")
+        
+            if price is None:
+                return jsonify({
+                    "ok": False,
+                    "error": "Close alert missing price",
+                }), 400
+        
+            close_price = float(price)
+            CURRENT_PRICE = close_price
+        
+            if not POSITION_OPEN or CURRENT_POSITION is None:
+                return jsonify({
+                    "ok": True,
+                    "message": "Close alert received but no position open",
+                    "current_price": CURRENT_PRICE,
+                    "position_open": False,
+                    "current_position": None,
+                }), 200
+
+    reason = data.get("reason", "tradingview_close")
+    closed_trade = close_position(reason, close_price)
+
+    return jsonify({
+        "ok": True,
+        "message": "Position closed by TradingView alert",
+        "closed_trade": closed_trade,
+        "current_price": CURRENT_PRICE,
+        "position_open": POSITION_OPEN,
+        "current_position": CURRENT_POSITION,
+    }), 200
+
         ENGINE_STATE["signals_received"] += 1
 
         entry_price = data.get("entry")
