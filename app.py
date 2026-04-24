@@ -185,7 +185,7 @@ def close_position(reason: str, price: float) -> dict[str, Any] | None:
 
 @app.route("/", methods=["GET"])
 def health():
-    return "TradingView Dashboard API is running", 200
+    return jsonify({"status": "ok", "message": "API running"})
 
 
 @app.route("/status", methods=["GET"])
