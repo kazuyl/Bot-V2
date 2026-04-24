@@ -305,6 +305,7 @@
         text('winrate', `${fmt(m.winrate)}%`);
         text('avg_r', fmt(m.avg_r, 3));
         text('realized_r', fmt(m.realized_r, 2));
+        text('current_price', fmt(data.current_price, 2));
         text('realized_pnl', `$${fmt(m.realized_pnl, 2)}`);
         text('signals_received', e.signals_received ?? 0);
         text('signals_accepted', e.signals_accepted ?? 0);
