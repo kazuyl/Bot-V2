@@ -277,6 +277,13 @@ def webhook():
 @app.route("/price_update", methods=["POST"])
 def price_update():
     global CURRENT_PRICE
+    PRICE_HISTORY.append({
+    "time": int(datetime.now(timezone.utc).timestamp()),
+    "price": price
+})
+
+if len(PRICE_HISTORY) > 500:
+    PRICE_HISTORY.pop(0)
 
     try:
         data = request.get_json(silent=True)
