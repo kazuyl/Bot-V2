@@ -496,6 +496,49 @@
       loadData();
     }
 
+    let priceChart;
+
+async function loadPriceChart() {
+  try {
+    const res = await fetch(`${apiBase()}/price_history`);
+    const data = await res.json();
+
+    const prices = data.prices || [];
+
+    const labels = prices.map(p => {
+      const d = new Date(p.time * 1000);
+      return d.toLocaleTimeString();
+    });
+
+    const values = prices.map(p => p.price);
+
+    const ctx = document.getElementById("priceChart");
+
+    if (priceChart) priceChart.destroy();
+
+    priceChart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: labels,
+        datasets: [{
+          label: "Price",
+          data: values,
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false
+      }
+    });
+
+  } catch (err) {
+    console.error("Chart error", err);
+  }
+}
+
     loadData();
     setInterval(loadData, 2000);
   </script>
