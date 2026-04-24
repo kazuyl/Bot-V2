@@ -273,6 +273,14 @@ def webhook():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
+@app.route("/price_history", methods=["GET"])
+def price_history():
+    return jsonify({
+        "ok": True,
+        "prices": PRICE_HISTORY,
+        "current_position": CURRENT_POSITION,
+        "position_open": POSITION_OPEN,
+    })
 
 @app.route("/price_update", methods=["POST"])
 def price_update():
