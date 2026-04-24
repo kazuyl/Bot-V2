@@ -10,6 +10,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 CURRENT_PRICE = None
+PRICE_HISTORY = []
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
@@ -71,11 +72,7 @@ def read_jsonl(path: Path, limit: int = 20) -> list[dict[str, Any]]:
     if not path.exists():
         return []
     lines = path.read_text(encoding="utf-8").splitlines()
-    out = []
-    for line in lines[-limit:]:
-        if line.strip():
-            out.append(json.loads(line))
-    return out
+    return [json.loads(line) for line in lines[-limit:] if line.strip()]
 
 
 def calculate_contracts(entry, stop) -> int:
@@ -228,6 +225,16 @@ def dashboard_data():
     })
 
 
+@app.route("/price_history", methods=["GET"])
+def price_history():
+    return jsonify({
+        "ok": True,
+        "prices": PRICE_HISTORY,
+        "current_position": CURRENT_POSITION,
+        "position_open": POSITION_OPEN,
+    })
+
+
 @app.route("/webhook", methods=["POST"])
 def webhook():
     global LAST_SIGNAL, ENGINE_STATE, CURRENT_PRICE
@@ -273,25 +280,10 @@ def webhook():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
-@app.route("/price_history", methods=["GET"])
-def price_history():
-    return jsonify({
-        "ok": True,
-        "prices": PRICE_HISTORY,
-        "current_position": CURRENT_POSITION,
-        "position_open": POSITION_OPEN,
-    })
 
 @app.route("/price_update", methods=["POST"])
 def price_update():
-    global CURRENT_PRICE
-    PRICE_HISTORY.append({
-    "time": int(datetime.now(timezone.utc).timestamp()),
-    "price": price
-})
-
-if len(PRICE_HISTORY) > 500:
-    PRICE_HISTORY.pop(0)
+    global CURRENT_PRICE, PRICE_HISTORY
 
     try:
         data = request.get_json(silent=True)
@@ -300,6 +292,14 @@ if len(PRICE_HISTORY) > 500:
 
         price = float(data.get("price"))
         CURRENT_PRICE = price
+
+        PRICE_HISTORY.append({
+            "time": int(datetime.now(timezone.utc).timestamp()),
+            "price": price,
+        })
+
+        if len(PRICE_HISTORY) > 500:
+            PRICE_HISTORY.pop(0)
 
         if not POSITION_OPEN or CURRENT_POSITION is None:
             return jsonify({
@@ -344,7 +344,6 @@ def reset_position():
 
     POSITION_OPEN = False
     CURRENT_POSITION = None
-
     write_json(POSITION_FILE, None)
 
     return jsonify({"ok": True, "message": "Position reset"}), 200
@@ -365,3 +364,6 @@ def load_state():
 
 load_state()
 
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
