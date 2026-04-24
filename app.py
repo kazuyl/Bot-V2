@@ -200,6 +200,7 @@ def dashboard_data() -> Any:
 
     return jsonify({
         'ok': True,
+        'current_price': CURRENT_PRICE,
         'position_open': POSITION_OPEN,
         'current_position': CURRENT_POSITION,
         'engine_state': ENGINE_STATE,
