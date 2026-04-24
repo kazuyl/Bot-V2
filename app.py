@@ -21,7 +21,7 @@ TRADES_FILE = DATA_DIR / "trades.jsonl"
 POSITION_FILE = DATA_DIR / "position.json"
 STATE_FILE = DATA_DIR / "engine_state.json"
 
-WEBHOOK_SECRET = "my_super_secret_key"
+WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "my_super_secret_key")
 ACCOUNT_SIZE = 50_000
 RISK_PERCENT = 0.5
 POINT_VALUE = 20
@@ -283,7 +283,6 @@ def webhook():
         ENGINE_STATE["signals_received"] += 1
 
         entry_price = data.get("entry")
-
         if entry_price is not None:
             CURRENT_PRICE = float(entry_price)
 
@@ -302,50 +301,6 @@ def webhook():
                 "ignored": True,
                 "reason": "position already open",
             }), 200
-
-        signal = normalize_signal(data)
-        append_jsonl(LOG_FILE, signal)
-        accept_signal(signal)
-
-        return jsonify({
-            "ok": True,
-            "message": "Signal accepted",
-            "position_open": POSITION_OPEN,
-            "current_position": CURRENT_POSITION,
-            "current_price": CURRENT_PRICE,
-        }), 200
-
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-   
-
-    return jsonify({
-        "ok": True,
-        "message": "Position closed by TradingView alert",
-        "closed_trade": closed_trade,
-        "current_price": CURRENT_PRICE,
-        "position_open": POSITION_OPEN,
-        "current_position": CURRENT_POSITION,
-    }), 200
-
-        ENGINE_STATE["signals_received"] += 1
-
-        entry_price = data.get("entry")
-        if entry_price is not None:
-            CURRENT_PRICE = float(entry_price)
-
-        if LAST_SIGNAL == data:
-            ENGINE_STATE["signals_ignored_duplicates"] += 1
-            write_json(STATE_FILE, ENGINE_STATE)
-            return jsonify({"ok": True, "duplicate": True}), 200
-
-        LAST_SIGNAL = data
-
-        if POSITION_OPEN:
-            ENGINE_STATE["signals_ignored_position_open"] += 1
-            write_json(STATE_FILE, ENGINE_STATE)
-            return jsonify({"ok": True, "ignored": True, "reason": "position already open"}), 200
 
         signal = normalize_signal(data)
         append_jsonl(LOG_FILE, signal)
