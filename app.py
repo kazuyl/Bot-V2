@@ -8,6 +8,10 @@ from typing import Any
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+import threading
+import time
+import requests
+import websocket
 
 CURRENT_PRICE = None
 PRICE_HISTORY = []
