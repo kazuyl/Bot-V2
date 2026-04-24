@@ -6,6 +6,27 @@
   <title>Trading Bot Dashboard</title>
 
   <style>
+    button {
+      border: none;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    
+    .danger-btn {
+      flex: 1;
+      padding: 12px;
+      border-radius: 12px;
+      background: #ef4444;
+      color: white;
+    }
+    
+    .be-btn {
+      flex: 1;
+      padding: 12px;
+      border-radius: 12px;
+      background: #f59e0b;
+      color: #09090b;
+    }
     * {
       box-sizing: border-box;
       font-family: Inter, Arial, sans-serif;
@@ -271,7 +292,10 @@
         </div>
       </div>
     </div>
-
+    <div style="display:flex; gap:10px; margin-top:16px;">
+  <button onclick="closePosition()" class="danger-btn">Close Position</button>
+  <button onclick="moveBreakeven()" class="be-btn">Move SL to BE</button>
+    </div>
     <div class="grid bottom">
       <div class="card">
         <h2>Recent Signals</h2>
@@ -340,6 +364,34 @@
       if (Number(value) > 0) element.classList.add("positive");
       if (Number(value) < 0) element.classList.add("negative");
     }
+
+    async function closePosition() {
+  if (!confirm("Position wirklich schliessen?")) return;
+
+  const res = await fetch(`${API_URL}/close_position`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    }
+  });
+
+  const data = await res.json();
+  console.log(data);
+  loadDashboard();
+}
+
+async function moveBreakeven() {
+  const res = await fetch(`${API_URL}/move_to_breakeven`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    }
+  });
+
+  const data = await res.json();
+  console.log(data);
+  loadDashboard();
+}
 
     async function loadDashboard() {
       try {
