@@ -4,370 +4,174 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Trading Bot Dashboard</title>
-
   <style>
     :root {
-      --bg: #0b1020;
-      --panel: #121932;
-      --panel2: #0f152b;
-      --text: #edf2ff;
-      --muted: #99a3c7;
-      --line: rgba(255,255,255,0.08);
-      --green: #2ecc71;
-      --red: #ff5c5c;
-      --yellow: #f5c451;
+      --bg:#070b16; --panel:#10182f; --panel2:#0c1224;
+      --text:#edf2ff; --muted:#94a0c6; --line:rgba(255,255,255,.08);
+      --green:#2ecc71; --red:#ff5c5c; --yellow:#f5c451; --blue:#63a4ff;
     }
-
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-    }
-
-    .wrap {
-      max-width: 1450px;
-      margin: 0 auto;
-      padding: 28px;
-    }
-
-    .card {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 20px;
-      padding: 20px;
-      margin-bottom: 18px;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: 1.2fr 0.8fr;
-      gap: 18px;
-    }
-
-    .row {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 12px;
-      margin-top: 12px;
-    }
-
-    .kv {
-      background: rgba(255,255,255,0.04);
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 14px;
-    }
-
-    .label {
-      color: var(--muted);
-      font-size: 12px;
-      margin-bottom: 8px;
-    }
-
-    .value {
-      font-size: 24px;
-      font-weight: 800;
-    }
-
-    .muted { color: var(--muted); }
-
-    input {
-      width: 100%;
-      padding: 12px;
-      border-radius: 12px;
-      border: 1px solid var(--line);
-      background: var(--panel2);
-      color: var(--text);
-    }
-
-    button {
-      margin-top: 10px;
-      margin-right: 8px;
-      padding: 12px 16px;
-      border-radius: 12px;
-      border: 1px solid var(--line);
-      background: #172042;
-      color: var(--text);
-      cursor: pointer;
-      font-weight: 600;
-    }
-
-    .item {
-      background: rgba(255,255,255,0.035);
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      padding: 12px;
-      margin-bottom: 10px;
-      font-size: 14px;
-    }
-
-    .badge {
-      display: inline-block;
-      padding: 8px 12px;
-      border-radius: 999px;
-      font-size: 13px;
-    }
-
-    .green { background: rgba(46,204,113,0.14); color: #9ff0bf; }
-    .yellow { background: rgba(245,196,81,0.14); color: #ffe4a3; }
-
-    .chart-wrap {
-      height: 420px;
-    }
-
-    canvas {
-      width: 100% !important;
-      height: 100% !important;
-    }
-
-    @media (max-width: 1000px) {
-      .grid, .row {
-        grid-template-columns: 1fr;
-      }
-    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,sans-serif}
+    .wrap{max-width:1600px;margin:0 auto;padding:22px}
+    .top{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:16px}
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:18px;padding:16px}
+    .grid{display:grid;grid-template-columns:1fr 360px;gap:16px}
+    .stats{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:16px}
+    .kv{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:14px;padding:12px}
+    .label{font-size:12px;color:var(--muted);margin-bottom:6px}
+    .value{font-size:22px;font-weight:800}
+    .chart{height:690px}
+    .side{display:grid;gap:16px}
+    .item{border:1px solid var(--line);border-radius:12px;padding:10px;background:rgba(255,255,255,.03);margin-bottom:8px;font-size:13px}
+    .muted{color:var(--muted)}
+    .badge{display:inline-block;padding:7px 11px;border-radius:999px;font-size:13px}
+    .green{background:rgba(46,204,113,.14);color:#9ff0bf}
+    .yellow{background:rgba(245,196,81,.14);color:#ffe4a3}
+    input{width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:#0b1020;color:var(--text)}
+    button{margin-top:8px;padding:10px 13px;border-radius:10px;border:1px solid var(--line);background:#172042;color:var(--text);cursor:pointer}
+    @media(max-width:1100px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.chart{height:560px}}
   </style>
 </head>
-
 <body>
   <div class="wrap">
-    <h1>Trading Bot Dashboard</h1>
-    <p class="muted">Live dashboard for webhook, price feed and paper trades</p>
+    <div class="top">
+      <div>
+        <h1 style="margin:0">Trading Bot Dashboard</h1>
+        <div class="muted">TopstepX style dashboard · TradingView chart + bot data</div>
+      </div>
+      <div class="badge yellow">API: <span id="api-status">Waiting</span></div>
+    </div>
 
-    <div class="card">
+    <div class="card" style="margin-bottom:16px">
       <div class="label">API Base URL</div>
       <input id="apiBase" value="https://bot-v2-production.up.railway.app" />
       <button onclick="loadData()">Refresh</button>
       <button onclick="resetPosition()">Reset Position</button>
-      <p>API: <span id="api-status">Waiting</span></p>
+    </div>
+
+    <div class="stats">
+      <div class="kv"><div class="label">Current Price</div><div class="value" id="current_price">-</div></div>
+      <div class="kv"><div class="label">Closed Trades</div><div class="value" id="closed_trades">-</div></div>
+      <div class="kv"><div class="label">Winrate</div><div class="value" id="winrate">-</div></div>
+      <div class="kv"><div class="label">Average R</div><div class="value" id="avg_r">-</div></div>
+      <div class="kv"><div class="label">Realized R</div><div class="value" id="realized_r">-</div></div>
+      <div class="kv"><div class="label">Realized PnL</div><div class="value" id="realized_pnl">-</div></div>
     </div>
 
     <div class="grid">
-      <div>
-        <div class="card">
-          <h2>Engine Metrics</h2>
-
-          <div class="row">
-            <div class="kv">
-              <div class="label">Current Price</div>
-              <div class="value" id="current_price">-</div>
-            </div>
-
-            <div class="kv">
-              <div class="label">Closed Trades</div>
-              <div class="value" id="closed_trades">-</div>
-            </div>
-
-            <div class="kv">
-              <div class="label">Winrate</div>
-              <div class="value" id="winrate">-</div>
-            </div>
-
-            <div class="kv">
-              <div class="label">Average R</div>
-              <div class="value" id="avg_r">-</div>
-            </div>
-          </div>
-
-          <div class="row">
-            <div class="kv">
-              <div class="label">Realized R</div>
-              <div class="value" id="realized_r">-</div>
-            </div>
-
-            <div class="kv">
-              <div class="label">Realized PnL</div>
-              <div class="value" id="realized_pnl">-</div>
-            </div>
-
-            <div class="kv">
-              <div class="label">Signals Received</div>
-              <div class="value" id="signals_received">-</div>
-            </div>
-
-            <div class="kv">
-              <div class="label">Signals Accepted</div>
-              <div class="value" id="signals_accepted">-</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="card">
-          <h2>Live Price Chart</h2>
-          <div class="chart-wrap">
-            <canvas id="priceChart"></canvas>
-          </div>
-        </div>
-
-        <div class="card">
-          <h2>Open Position</h2>
-          <div id="open_position_badge"></div>
-          <div id="open_position" style="margin-top:12px"></div>
+      <div class="card">
+        <h2 style="margin-top:0">TradingView Chart</h2>
+        <div class="tradingview-widget-container chart">
+          <div id="tradingview_chart" style="height:100%"></div>
         </div>
       </div>
 
-      <div>
+      <div class="side">
         <div class="card">
-          <h2>Recent Signals</h2>
+          <h2 style="margin-top:0">Open Position</h2>
+          <div id="open_position_badge"></div>
+          <div id="open_position" style="margin-top:12px"></div>
+        </div>
+
+        <div class="card">
+          <h2 style="margin-top:0">Engine</h2>
+          <div class="item">Signals Received: <b id="signals_received">-</b></div>
+          <div class="item">Signals Accepted: <b id="signals_accepted">-</b></div>
+          <div class="item">Ignored: <b id="ignored_total">-</b></div>
+        </div>
+
+        <div class="card">
+          <h2 style="margin-top:0">Recent Signals</h2>
           <div id="recent_signals"></div>
         </div>
 
         <div class="card">
-          <h2>Recent Trades</h2>
+          <h2 style="margin-top:0">Recent Trades</h2>
           <div id="recent_trades"></div>
         </div>
       </div>
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
+  <script src="https://s3.tradingview.com/tv.js"></script>
   <script>
-    let priceChart = null;
+    new TradingView.widget({
+      container_id: "tradingview_chart",
+      autosize: true,
+      symbol: "CME_MINI:MNQ1!",
+      interval: "5",
+      timezone: "Etc/UTC",
+      theme: "dark",
+      style: "1",
+      locale: "en",
+      toolbar_bg: "#070b16",
+      enable_publishing: false,
+      hide_side_toolbar: false,
+      allow_symbol_change: true,
+      details: true,
+      studies: []
+    });
 
-    function apiBase() {
-      return document.getElementById("apiBase").value.replace(/\/$/, "");
-    }
+    function apiBase(){ return document.getElementById("apiBase").value.replace(/\/$/, ""); }
+    function fmt(v,d=2){ if(v===null||v===undefined||Number.isNaN(Number(v))) return "-"; return Number(v).toFixed(d); }
+    function text(id,value){ const el=document.getElementById(id); if(el) el.textContent=value; }
 
-    function fmt(v, digits = 2) {
-      if (v === null || v === undefined || Number.isNaN(Number(v))) return "-";
-      return Number(v).toFixed(digits);
-    }
-
-    function text(id, value) {
-      const el = document.getElementById(id);
-      if (el) el.textContent = value;
-    }
-
-    function itemHtml(obj) {
+    function itemHtml(obj){
       return Object.entries(obj || {})
         .filter(([k]) => k !== "raw")
-        .map(([k, v]) => `<div><strong>${k}</strong>: <span class="muted">${v ?? "-"}</span></div>`)
+        .map(([k,v]) => `<div><strong>${k}</strong>: <span class="muted">${v ?? "-"}</span></div>`)
         .join("");
     }
 
-    async function loadData() {
-      try {
+    async function loadData(){
+      try{
         const res = await fetch(`${apiBase()}/dashboard_data`);
         const data = await res.json();
-
-        text("api-status", "Connected");
+        text("api-status","Connected");
 
         const m = data.metrics || {};
         const e = data.engine_state || {};
 
-        text("current_price", fmt(data.current_price, 2));
+        text("current_price", fmt(data.current_price,2));
         text("closed_trades", m.closed_trades ?? 0);
-        text("winrate", `${fmt(m.winrate, 2)}%`);
-        text("avg_r", fmt(m.avg_r, 3));
-        text("realized_r", fmt(m.realized_r, 2));
-        text("realized_pnl", `$${fmt(m.realized_pnl, 2)}`);
+        text("winrate", `${fmt(m.winrate,2)}%`);
+        text("avg_r", fmt(m.avg_r,3));
+        text("realized_r", fmt(m.realized_r,2));
+        text("realized_pnl", `$${fmt(m.realized_pnl,2)}`);
         text("signals_received", e.signals_received ?? 0);
         text("signals_accepted", e.signals_accepted ?? 0);
+        text("ignored_total", (Number(e.signals_ignored_duplicates||0)+Number(e.signals_ignored_position_open||0)).toString());
 
-        const badge = document.getElementById("open_position_badge");
-        badge.innerHTML = data.position_open
+        document.getElementById("open_position_badge").innerHTML = data.position_open
           ? `<span class="badge green">Position Open</span>`
           : `<span class="badge yellow">No Open Position</span>`;
 
-        const open = document.getElementById("open_position");
-        open.innerHTML = data.current_position
+        document.getElementById("open_position").innerHTML = data.current_position
           ? `<div class="item">${itemHtml(data.current_position)}</div>`
           : `<div class="muted">No active position</div>`;
 
-        const sigs = document.getElementById("recent_signals");
-        sigs.innerHTML = "";
-        (data.recent_signals || []).forEach(s => {
-          sigs.innerHTML += `<div class="item">${itemHtml(s)}</div>`;
-        });
-        if (!sigs.innerHTML) sigs.innerHTML = `<div class="muted">No signals yet</div>`;
+        const sigs=document.getElementById("recent_signals");
+        sigs.innerHTML="";
+        (data.recent_signals||[]).forEach(s=>sigs.innerHTML+=`<div class="item">${itemHtml(s)}</div>`);
+        if(!sigs.innerHTML) sigs.innerHTML=`<div class="muted">No signals yet</div>`;
 
-        const trades = document.getElementById("recent_trades");
-        trades.innerHTML = "";
-        (data.recent_trades || []).forEach(t => {
-          trades.innerHTML += `<div class="item">${itemHtml(t)}</div>`;
-        });
-        if (!trades.innerHTML) trades.innerHTML = `<div class="muted">No trades yet</div>`;
-
-      } catch (err) {
-        text("api-status", "Offline");
+        const trades=document.getElementById("recent_trades");
+        trades.innerHTML="";
+        (data.recent_trades||[]).forEach(t=>trades.innerHTML+=`<div class="item">${itemHtml(t)}</div>`);
+        if(!trades.innerHTML) trades.innerHTML=`<div class="muted">No trades yet</div>`;
+      }catch(err){
+        text("api-status","Offline");
         console.error(err);
       }
     }
 
-    async function loadPriceChart() {
-      try {
-        const res = await fetch(`${apiBase()}/price_history`);
-        const data = await res.json();
-
-        const prices = data.prices || [];
-
-        const labels = prices.map(p => {
-          const d = new Date(p.time * 1000);
-          return d.toLocaleTimeString();
-        });
-
-        const values = prices.map(p => Number(p.price));
-
-        const ctx = document.getElementById("priceChart");
-
-        if (priceChart) {
-          priceChart.data.labels = labels;
-          priceChart.data.datasets[0].data = values;
-          priceChart.update();
-          return;
-        }
-
-        priceChart = new Chart(ctx, {
-          type: "line",
-          data: {
-            labels,
-            datasets: [{
-              label: "Price",
-              data: values,
-              borderWidth: 2,
-              pointRadius: 0,
-              tension: 0.2
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: {
-                labels: { color: "#edf2ff" }
-              }
-            },
-            scales: {
-              x: {
-                ticks: { color: "#99a3c7" },
-                grid: { color: "rgba(255,255,255,0.06)" }
-              },
-              y: {
-                ticks: { color: "#99a3c7" },
-                grid: { color: "rgba(255,255,255,0.06)" }
-              }
-            }
-          }
-        });
-
-      } catch (err) {
-        console.error("Price chart error", err);
-      }
-    }
-
-    async function resetPosition() {
-      await fetch(`${apiBase()}/reset_position`, { method: "POST" });
+    async function resetPosition(){
+      await fetch(`${apiBase()}/reset_position`, { method:"POST" });
       loadData();
     }
 
     loadData();
-    loadPriceChart();
-
     setInterval(loadData, 2000);
-    setInterval(loadPriceChart, 2000);
   </script>
 </body>
 </html>
