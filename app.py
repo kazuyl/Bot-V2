@@ -104,4 +104,252 @@ def normalize_signal(data: dict[str, Any]) -> dict[str, Any]:
         "side": data.get("side"),
         "ticker": data.get("ticker"),
         "time": data.get("time"),
-        "entry
+        "entry": float(entry) if entry is not None else None,
+        "stop": float(stop) if stop is not None else None,
+        "tp": float(tp) if tp is not None else None,
+        "market_state": data.get("market_state"),
+        "contracts": calculate_contracts(entry, stop),
+        "raw": data,
+    }
+
+
+def accept_signal(signal: dict[str, Any]) -> None:
+    global POSITION_OPEN, CURRENT_POSITION, ENGINE_STATE
+
+    CURRENT_POSITION = {
+        "status": "open",
+        "opened_at": utc_now(),
+        "model": signal.get("model"),
+        "side": signal.get("side"),
+        "ticker": signal.get("ticker"),
+        "entry": signal.get("entry"),
+        "stop": signal.get("stop"),
+        "tp": signal.get("tp"),
+        "market_state": signal.get("market_state"),
+        "contracts": signal.get("contracts"),
+    }
+
+    POSITION_OPEN = True
+    ENGINE_STATE["signals_accepted"] += 1
+
+    write_json(POSITION_FILE, CURRENT_POSITION)
+    write_json(STATE_FILE, ENGINE_STATE)
+
+
+def close_position(reason: str, price: float) -> dict[str, Any] | None:
+    global POSITION_OPEN, CURRENT_POSITION, ENGINE_STATE
+
+    if not POSITION_OPEN or CURRENT_POSITION is None:
+        return None
+
+    entry = float(CURRENT_POSITION["entry"])
+    stop = float(CURRENT_POSITION["stop"])
+    side = CURRENT_POSITION["side"]
+    contracts = int(CURRENT_POSITION.get("contracts", 0))
+
+    risk = abs(entry - stop)
+
+    if risk == 0:
+        r_result = 0.0
+    elif side == "long":
+        r_result = (price - entry) / risk
+    else:
+        r_result = (entry - price) / risk
+
+    pnl = r_result * risk * POINT_VALUE * max(contracts, 1)
+
+    trade = {
+        **CURRENT_POSITION,
+        "status": "closed",
+        "closed_at": utc_now(),
+        "exit_reason": reason,
+        "exit_price": round(price, 2),
+        "r_result": round(r_result, 4),
+        "pnl": round(pnl, 2),
+    }
+
+    append_jsonl(TRADES_FILE, trade)
+
+    ENGINE_STATE["closed_trades"] += 1
+    ENGINE_STATE["realized_r"] = round(float(ENGINE_STATE["realized_r"]) + float(trade["r_result"]), 4)
+    ENGINE_STATE["realized_pnl"] = round(float(ENGINE_STATE["realized_pnl"]) + float(trade["pnl"]), 2)
+
+    POSITION_OPEN = False
+    CURRENT_POSITION = None
+
+    write_json(POSITION_FILE, None)
+    write_json(STATE_FILE, ENGINE_STATE)
+
+    return trade
+
+
+@app.route("/", methods=["GET"])
+def health():
+    return "TradingView Dashboard API is running", 200
+
+
+@app.route("/status", methods=["GET"])
+def status():
+    return jsonify({
+        "ok": True,
+        "current_price": CURRENT_PRICE,
+        "position_open": POSITION_OPEN,
+        "current_position": CURRENT_POSITION,
+        "engine_state": ENGINE_STATE,
+    })
+
+
+@app.route("/dashboard_data", methods=["GET"])
+def dashboard_data():
+    trades = read_jsonl(TRADES_FILE, limit=50)
+    signals = read_jsonl(LOG_FILE, limit=50)
+
+    closed = len(trades)
+    wins = len([t for t in trades if float(t.get("r_result", 0)) > 0])
+    avg_r = round(sum(float(t.get("r_result", 0)) for t in trades) / closed, 3) if closed else 0.0
+    winrate = round((wins / closed) * 100, 2) if closed else 0.0
+
+    return jsonify({
+        "ok": True,
+        "current_price": CURRENT_PRICE,
+        "position_open": POSITION_OPEN,
+        "current_position": CURRENT_POSITION,
+        "engine_state": ENGINE_STATE,
+        "metrics": {
+            "closed_trades": closed,
+            "wins": wins,
+            "winrate": winrate,
+            "avg_r": avg_r,
+            "realized_r": ENGINE_STATE["realized_r"],
+            "realized_pnl": ENGINE_STATE["realized_pnl"],
+        },
+        "recent_signals": list(reversed(signals[-10:])),
+        "recent_trades": list(reversed(trades[-10:])),
+    })
+
+
+@app.route("/webhook", methods=["POST"])
+def webhook():
+    global LAST_SIGNAL, ENGINE_STATE, CURRENT_PRICE
+
+    try:
+        data = request.get_json(silent=True)
+        if data is None:
+            return jsonify({"ok": False, "error": "No JSON received"}), 400
+
+        if data.get("secret") != WEBHOOK_SECRET:
+            return jsonify({"ok": False, "error": "Invalid secret"}), 403
+
+        ENGINE_STATE["signals_received"] += 1
+
+        entry_price = data.get("entry")
+        if entry_price is not None:
+            CURRENT_PRICE = float(entry_price)
+
+        if LAST_SIGNAL == data:
+            ENGINE_STATE["signals_ignored_duplicates"] += 1
+            write_json(STATE_FILE, ENGINE_STATE)
+            return jsonify({"ok": True, "duplicate": True}), 200
+
+        LAST_SIGNAL = data
+
+        if POSITION_OPEN:
+            ENGINE_STATE["signals_ignored_position_open"] += 1
+            write_json(STATE_FILE, ENGINE_STATE)
+            return jsonify({"ok": True, "ignored": True, "reason": "position already open"}), 200
+
+        signal = normalize_signal(data)
+        append_jsonl(LOG_FILE, signal)
+        accept_signal(signal)
+
+        return jsonify({
+            "ok": True,
+            "message": "Signal accepted",
+            "position_open": POSITION_OPEN,
+            "current_position": CURRENT_POSITION,
+            "current_price": CURRENT_PRICE,
+        }), 200
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/price_update", methods=["POST"])
+def price_update():
+    global CURRENT_PRICE
+
+    try:
+        data = request.get_json(silent=True)
+        if data is None:
+            return jsonify({"ok": False, "error": "No JSON received"}), 400
+
+        price = float(data.get("price"))
+        CURRENT_PRICE = price
+
+        if not POSITION_OPEN or CURRENT_POSITION is None:
+            return jsonify({
+                "ok": True,
+                "message": "No open position",
+                "current_price": CURRENT_PRICE,
+                "position_open": False,
+            }), 200
+
+        side = CURRENT_POSITION["side"]
+        stop = float(CURRENT_POSITION["stop"])
+        tp = float(CURRENT_POSITION["tp"])
+
+        closed_trade = None
+
+        if side == "long":
+            if price <= stop:
+                closed_trade = close_position("stop_loss", stop)
+            elif price >= tp:
+                closed_trade = close_position("take_profit", tp)
+        else:
+            if price >= stop:
+                closed_trade = close_position("stop_loss", stop)
+            elif price <= tp:
+                closed_trade = close_position("take_profit", tp)
+
+        return jsonify({
+            "ok": True,
+            "current_price": CURRENT_PRICE,
+            "closed_trade": closed_trade,
+            "position_open": POSITION_OPEN,
+            "current_position": CURRENT_POSITION,
+        }), 200
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/reset_position", methods=["POST"])
+def reset_position():
+    global POSITION_OPEN, CURRENT_POSITION
+
+    POSITION_OPEN = False
+    CURRENT_POSITION = None
+
+    write_json(POSITION_FILE, None)
+
+    return jsonify({"ok": True, "message": "Position reset"}), 200
+
+
+def load_state():
+    global POSITION_OPEN, CURRENT_POSITION, ENGINE_STATE
+
+    pos = read_json(POSITION_FILE)
+    if pos:
+        POSITION_OPEN = True
+        CURRENT_POSITION = pos
+
+    state = read_json(STATE_FILE)
+    if state:
+        ENGINE_STATE.update(state)
+
+
+load_state()
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
