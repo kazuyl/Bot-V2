@@ -373,7 +373,61 @@ def price_update():
 
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+@app.route("/close_position", methods=["POST"])
+def manual_close_position():
+    global CURRENT_PRICE
 
+    try:
+        data = request.get_json(silent=True) or {}
+
+        price = data.get("price", CURRENT_PRICE)
+
+        if price is None:
+            return jsonify({
+                "ok": False,
+                "error": "No price available to close position",
+            }), 400
+
+        closed_trade = close_position("manual_close", float(price))
+
+        return jsonify({
+            "ok": True,
+            "message": "Position manually closed",
+            "closed_trade": closed_trade,
+            "position_open": POSITION_OPEN,
+            "current_position": CURRENT_POSITION,
+        }), 200
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/move_to_breakeven", methods=["POST"])
+def move_to_breakeven():
+    global CURRENT_POSITION
+
+    try:
+        if not POSITION_OPEN or CURRENT_POSITION is None:
+            return jsonify({
+                "ok": False,
+                "error": "No open position",
+            }), 400
+
+        entry = float(CURRENT_POSITION["entry"])
+        CURRENT_POSITION["stop"] = entry
+        CURRENT_POSITION["breakeven"] = True
+        CURRENT_POSITION["moved_to_be_at"] = utc_now()
+
+        write_json(POSITION_FILE, CURRENT_POSITION)
+
+        return jsonify({
+            "ok": True,
+            "message": "Stop moved to breakeven",
+            "current_position": CURRENT_POSITION,
+        }), 200
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route("/reset_position", methods=["POST"])
 def reset_position():
