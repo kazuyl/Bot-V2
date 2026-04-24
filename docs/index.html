@@ -21,6 +21,97 @@
       --shadow: 0 14px 40px rgba(0,0,0,0.28);
       --radius: 20px;
     }
+
+    <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+
+<script>
+  let customChart;
+  let priceSeries;
+  let entryLine, stopLine, tpLine;
+
+  function initCustomChart() {
+    const el = document.getElementById("custom_chart");
+    if (!el) return;
+
+    customChart = LightweightCharts.createChart(el, {
+      height: 420,
+      layout: {
+        background: { color: "#0f152b" },
+        textColor: "#edf2ff",
+      },
+      grid: {
+        vertLines: { color: "rgba(255,255,255,0.06)" },
+        horzLines: { color: "rgba(255,255,255,0.06)" },
+      },
+      rightPriceScale: {
+        borderColor: "rgba(255,255,255,0.12)",
+      },
+      timeScale: {
+        borderColor: "rgba(255,255,255,0.12)",
+        timeVisible: true,
+        secondsVisible: true,
+      },
+    });
+
+    priceSeries = customChart.addLineSeries({
+      lineWidth: 2,
+    });
+  }
+
+  async function loadChartData() {
+    try {
+      const res = await fetch(`${apiBase()}/price_history`);
+      const data = await res.json();
+
+      const prices = (data.prices || []).map(p => ({
+        time: p.time,
+        value: Number(p.price),
+      }));
+
+      if (priceSeries && prices.length) {
+        priceSeries.setData(prices);
+      }
+
+      if (priceSeries) {
+        if (entryLine) priceSeries.removePriceLine(entryLine);
+        if (stopLine) priceSeries.removePriceLine(stopLine);
+        if (tpLine) priceSeries.removePriceLine(tpLine);
+
+        const pos = data.current_position;
+
+        if (pos) {
+          entryLine = priceSeries.createPriceLine({
+            price: Number(pos.entry),
+            title: "ENTRY",
+            lineWidth: 2,
+            axisLabelVisible: true,
+          });
+
+          stopLine = priceSeries.createPriceLine({
+            price: Number(pos.stop),
+            title: "SL",
+            lineWidth: 2,
+            axisLabelVisible: true,
+          });
+
+          tpLine = priceSeries.createPriceLine({
+            price: Number(pos.tp),
+            title: "TP",
+            lineWidth: 2,
+            axisLabelVisible: true,
+          });
+        }
+      }
+    } catch (e) {
+      console.error("chart error", e);
+    }
+  }
+
+  initCustomChart();
+  loadChartData();
+  setInterval(loadChartData, 2000);
+</script>
+    
     * { box-sizing: border-box; }
     body {
       margin: 0;
@@ -179,6 +270,11 @@
   </div>
 </div>
 
+<div class="card">
+  <h2 style="margin-top:0">Live Price Chart</h2>
+  <div id="custom_chart" style="height:420px;"></div>
+</div>
+        
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
   new TradingView.widget({
