@@ -5,14 +5,9 @@ import json
 import os
 from pathlib import Path
 from typing import Any
-import threading
-import time
 
-import requests
-import websocket
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-
 
 CURRENT_PRICE = None
 PRICE_HISTORY = []
@@ -26,36 +21,11 @@ TRADES_FILE = DATA_DIR / "trades.jsonl"
 POSITION_FILE = DATA_DIR / "position.json"
 STATE_FILE = DATA_DIR / "engine_state.json"
 
-WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "my_super_secret_key")
-
+WEBHOOK_SECRET = "my_super_secret_key"
 ACCOUNT_SIZE = 50_000
 RISK_PERCENT = 0.5
 POINT_VALUE = 20
 MAX_CONTRACTS = 5
-
-TRADOVATE_DEMO = os.environ.get("TRADOVATE_DEMO", "true").lower() == "true"
-TRADOVATE_USERNAME = os.environ.get("TRADOVATE_USERNAME")
-TRADOVATE_PASSWORD = os.environ.get("TRADOVATE_PASSWORD")
-TRADOVATE_APP_ID = os.environ.get("TRADOVATE_APP_ID")
-TRADOVATE_APP_VERSION = os.environ.get("TRADOVATE_APP_VERSION", "1.0")
-TRADOVATE_CID = os.environ.get("TRADOVATE_CID")
-TRADOVATE_SEC = os.environ.get("TRADOVATE_SEC")
-TRADOVATE_SYMBOL = os.environ.get("TRADOVATE_SYMBOL", "MNQM6")
-
-TRADOVATE_REST_URL = (
-    "https://demo.tradovateapi.com/v1"
-    if TRADOVATE_DEMO
-    else "https://live.tradovateapi.com/v1"
-)
-
-TRADOVATE_MD_WS_URL = (
-    "wss://md-demo.tradovateapi.com/v1/websocket"
-    if TRADOVATE_DEMO
-    else "wss://md.tradovateapi.com/v1/websocket"
-)
-
-TRADOVATE_CONNECTED = False
-TRADOVATE_LAST_ERROR = None
 
 app = Flask(__name__)
 CORS(app)
@@ -89,24 +59,18 @@ def write_json(path: Path, payload: dict[str, Any] | None) -> None:
         if path.exists():
             path.unlink()
         return
-
-    path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def read_json(path: Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
-
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def read_jsonl(path: Path, limit: int = 20) -> list[dict[str, Any]]:
     if not path.exists():
         return []
-
     lines = path.read_text(encoding="utf-8").splitlines()
     return [json.loads(line) for line in lines[-limit:] if line.strip()]
 
@@ -116,7 +80,6 @@ def calculate_contracts(entry, stop) -> int:
         return 0
 
     stop_distance = abs(float(entry) - float(stop))
-
     if stop_distance <= 0:
         return 0
 
@@ -205,14 +168,8 @@ def close_position(reason: str, price: float) -> dict[str, Any] | None:
     append_jsonl(TRADES_FILE, trade)
 
     ENGINE_STATE["closed_trades"] += 1
-    ENGINE_STATE["realized_r"] = round(
-        float(ENGINE_STATE["realized_r"]) + float(trade["r_result"]),
-        4,
-    )
-    ENGINE_STATE["realized_pnl"] = round(
-        float(ENGINE_STATE["realized_pnl"]) + float(trade["pnl"]),
-        2,
-    )
+    ENGINE_STATE["realized_r"] = round(float(ENGINE_STATE["realized_r"]) + float(trade["r_result"]), 4)
+    ENGINE_STATE["realized_pnl"] = round(float(ENGINE_STATE["realized_pnl"]) + float(trade["pnl"]), 2)
 
     POSITION_OPEN = False
     CURRENT_POSITION = None
@@ -223,183 +180,9 @@ def close_position(reason: str, price: float) -> dict[str, Any] | None:
     return trade
 
 
-def handle_live_price(price: float) -> None:
-    global CURRENT_PRICE, PRICE_HISTORY
-
-    CURRENT_PRICE = price
-
-    PRICE_HISTORY.append({
-        "time": int(datetime.now(timezone.utc).timestamp()),
-        "price": price,
-    })
-
-    if len(PRICE_HISTORY) > 500:
-        PRICE_HISTORY.pop(0)
-
-    if not POSITION_OPEN or CURRENT_POSITION is None:
-        return
-
-    side = CURRENT_POSITION["side"]
-    stop = float(CURRENT_POSITION["stop"])
-    tp = float(CURRENT_POSITION["tp"])
-
-    if side == "long":
-        if price <= stop:
-            close_position("stop_loss", stop)
-        elif price >= tp:
-            close_position("take_profit", tp)
-    else:
-        if price >= stop:
-            close_position("stop_loss", stop)
-        elif price <= tp:
-            close_position("take_profit", tp)
-
-
-def tradovate_login() -> str:
-    payload = {
-        "name": TRADOVATE_USERNAME,
-        "password": TRADOVATE_PASSWORD,
-        "appId": TRADOVATE_APP_ID,
-        "appVersion": TRADOVATE_APP_VERSION,
-        "cid": TRADOVATE_CID,
-        "sec": TRADOVATE_SEC,
-    }
-
-    response = requests.post(
-        f"{TRADOVATE_REST_URL}/auth/accesstokenrequest",
-        json=payload,
-        timeout=15,
-    )
-
-    response.raise_for_status()
-
-    data = response.json()
-    token = data.get("accessToken")
-
-    if not token:
-        raise RuntimeError(f"No accessToken in Tradovate response: {data}")
-
-    return token
-
-
-def extract_price_from_tradovate_message(message: str) -> float | None:
-    try:
-        if not message:
-            return None
-
-        if message in ("o", "h"):
-            return None
-
-        if not message.startswith("a"):
-            return None
-
-        payload = json.loads(message[1:])
-
-        for item in payload:
-            data = item.get("d")
-
-            if isinstance(data, dict):
-                price = (
-                    data.get("lastPrice")
-                    or data.get("price")
-                    or data.get("close")
-                    or data.get("bid")
-                    or data.get("ask")
-                )
-
-                if price is not None:
-                    return float(price)
-
-            if isinstance(data, list):
-                for x in data:
-                    if isinstance(x, dict):
-                        price = (
-                            x.get("lastPrice")
-                            or x.get("price")
-                            or x.get("close")
-                            or x.get("bid")
-                            or x.get("ask")
-                        )
-
-                        if price is not None:
-                            return float(price)
-
-    except Exception:
-        return None
-
-    return None
-
-
-def tradovate_market_data_loop() -> None:
-    global TRADOVATE_CONNECTED, TRADOVATE_LAST_ERROR
-
-    while True:
-        try:
-            token = tradovate_login()
-
-            ws = websocket.WebSocket()
-            ws.connect(TRADOVATE_MD_WS_URL, timeout=10)
-
-            TRADOVATE_CONNECTED = True
-            TRADOVATE_LAST_ERROR = None
-
-            ws.send(f"authorize\n1\n\n{token}")
-
-            quote_payload = json.dumps({
-                "symbol": TRADOVATE_SYMBOL,
-            })
-
-            ws.send(f"md/subscribeQuote\n2\n\n{quote_payload}")
-
-            last_heartbeat = time.time()
-
-            while True:
-                message = ws.recv()
-
-                if time.time() - last_heartbeat > 2.5:
-                    ws.send("[]")
-                    last_heartbeat = time.time()
-
-                price = extract_price_from_tradovate_message(message)
-
-                if price is not None:
-                    handle_live_price(price)
-
-        except Exception as e:
-            TRADOVATE_CONNECTED = False
-            TRADOVATE_LAST_ERROR = str(e)
-            print("Tradovate error:", TRADOVATE_LAST_ERROR)
-            time.sleep(5)
-
-
-def start_tradovate_thread() -> None:
-    required = [
-        TRADOVATE_USERNAME,
-        TRADOVATE_PASSWORD,
-        TRADOVATE_APP_ID,
-        TRADOVATE_CID,
-        TRADOVATE_SEC,
-    ]
-
-    if not all(required):
-        print("Tradovate disabled: missing environment variables")
-        return
-
-    thread = threading.Thread(
-        target=tradovate_market_data_loop,
-        daemon=True,
-    )
-
-    thread.start()
-
-
 @app.route("/", methods=["GET"])
 def health():
-    return jsonify({
-        "status": "ok",
-        "message": "API running",
-        "tradovate_connected": TRADOVATE_CONNECTED,
-    })
+    return jsonify({"status": "ok", "message": "API running"})
 
 
 @app.route("/status", methods=["GET"])
@@ -410,13 +193,6 @@ def status():
         "position_open": POSITION_OPEN,
         "current_position": CURRENT_POSITION,
         "engine_state": ENGINE_STATE,
-        "tradovate": {
-            "enabled": bool(TRADOVATE_USERNAME),
-            "connected": TRADOVATE_CONNECTED,
-            "symbol": TRADOVATE_SYMBOL,
-            "demo": TRADOVATE_DEMO,
-            "last_error": TRADOVATE_LAST_ERROR,
-        },
     })
 
 
@@ -427,13 +203,7 @@ def dashboard_data():
 
     closed = len(trades)
     wins = len([t for t in trades if float(t.get("r_result", 0)) > 0])
-
-    avg_r = (
-        round(sum(float(t.get("r_result", 0)) for t in trades) / closed, 3)
-        if closed
-        else 0.0
-    )
-
+    avg_r = round(sum(float(t.get("r_result", 0)) for t in trades) / closed, 3) if closed else 0.0
     winrate = round((wins / closed) * 100, 2) if closed else 0.0
 
     return jsonify({
@@ -452,13 +222,6 @@ def dashboard_data():
         },
         "recent_signals": list(reversed(signals[-10:])),
         "recent_trades": list(reversed(trades[-10:])),
-        "tradovate": {
-            "enabled": bool(TRADOVATE_USERNAME),
-            "connected": TRADOVATE_CONNECTED,
-            "symbol": TRADOVATE_SYMBOL,
-            "demo": TRADOVATE_DEMO,
-            "last_error": TRADOVATE_LAST_ERROR,
-        },
     })
 
 
@@ -478,46 +241,29 @@ def webhook():
 
     try:
         data = request.get_json(silent=True)
-
         if data is None:
-            return jsonify({
-                "ok": False,
-                "error": "No JSON received",
-            }), 400
+            return jsonify({"ok": False, "error": "No JSON received"}), 400
 
         if data.get("secret") != WEBHOOK_SECRET:
-            return jsonify({
-                "ok": False,
-                "error": "Invalid secret",
-            }), 403
+            return jsonify({"ok": False, "error": "Invalid secret"}), 403
 
         ENGINE_STATE["signals_received"] += 1
 
         entry_price = data.get("entry")
-
-        if entry_price is not None and CURRENT_PRICE is None:
+        if entry_price is not None:
             CURRENT_PRICE = float(entry_price)
 
         if LAST_SIGNAL == data:
             ENGINE_STATE["signals_ignored_duplicates"] += 1
             write_json(STATE_FILE, ENGINE_STATE)
-
-            return jsonify({
-                "ok": True,
-                "duplicate": True,
-            }), 200
+            return jsonify({"ok": True, "duplicate": True}), 200
 
         LAST_SIGNAL = data
 
         if POSITION_OPEN:
             ENGINE_STATE["signals_ignored_position_open"] += 1
             write_json(STATE_FILE, ENGINE_STATE)
-
-            return jsonify({
-                "ok": True,
-                "ignored": True,
-                "reason": "position already open",
-            }), 200
+            return jsonify({"ok": True, "ignored": True, "reason": "position already open"}), 200
 
         signal = normalize_signal(data)
         append_jsonl(LOG_FILE, signal)
@@ -532,38 +278,64 @@ def webhook():
         }), 200
 
     except Exception as e:
-        return jsonify({
-            "ok": False,
-            "error": str(e),
-        }), 500
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.route("/price_update", methods=["POST"])
 def price_update():
+    global CURRENT_PRICE, PRICE_HISTORY
+
     try:
         data = request.get_json(silent=True)
-
         if data is None:
-            return jsonify({
-                "ok": False,
-                "error": "No JSON received",
-            }), 400
+            return jsonify({"ok": False, "error": "No JSON received"}), 400
 
         price = float(data.get("price"))
-        handle_live_price(price)
+        CURRENT_PRICE = price
+
+        PRICE_HISTORY.append({
+            "time": int(datetime.now(timezone.utc).timestamp()),
+            "price": price,
+        })
+
+        if len(PRICE_HISTORY) > 500:
+            PRICE_HISTORY.pop(0)
+
+        if not POSITION_OPEN or CURRENT_POSITION is None:
+            return jsonify({
+                "ok": True,
+                "message": "No open position",
+                "current_price": CURRENT_PRICE,
+                "position_open": False,
+            }), 200
+
+        side = CURRENT_POSITION["side"]
+        stop = float(CURRENT_POSITION["stop"])
+        tp = float(CURRENT_POSITION["tp"])
+
+        closed_trade = None
+
+        if side == "long":
+            if price <= stop:
+                closed_trade = close_position("stop_loss", stop)
+            elif price >= tp:
+                closed_trade = close_position("take_profit", tp)
+        else:
+            if price >= stop:
+                closed_trade = close_position("stop_loss", stop)
+            elif price <= tp:
+                closed_trade = close_position("take_profit", tp)
 
         return jsonify({
             "ok": True,
             "current_price": CURRENT_PRICE,
+            "closed_trade": closed_trade,
             "position_open": POSITION_OPEN,
             "current_position": CURRENT_POSITION,
         }), 200
 
     except Exception as e:
-        return jsonify({
-            "ok": False,
-            "error": str(e),
-        }), 500
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.route("/reset_position", methods=["POST"])
@@ -572,38 +344,26 @@ def reset_position():
 
     POSITION_OPEN = False
     CURRENT_POSITION = None
-
     write_json(POSITION_FILE, None)
 
-    return jsonify({
-        "ok": True,
-        "message": "Position reset",
-    }), 200
+    return jsonify({"ok": True, "message": "Position reset"}), 200
 
 
 def load_state():
     global POSITION_OPEN, CURRENT_POSITION, ENGINE_STATE
 
-    position = read_json(POSITION_FILE)
-
-    if position:
+    pos = read_json(POSITION_FILE)
+    if pos:
         POSITION_OPEN = True
-        CURRENT_POSITION = position
+        CURRENT_POSITION = pos
 
     state = read_json(STATE_FILE)
-
     if state:
         ENGINE_STATE.update(state)
 
 
 load_state()
-start_tradovate_thread()
-
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-
-    app.run(
-        host="0.0.0.0",
-        port=port,
-    )
+    app.run(host="0.0.0.0", port=port)
