@@ -267,6 +267,7 @@ def webhook() -> Any:
 
 @app.route('/price_update', methods=['POST'])
 def price_update() -> Any:
+    global CURRENT_PRICE
     try:
         data = request.get_json(silent=True)
         if data is None:
@@ -276,6 +277,7 @@ def price_update() -> Any:
             return jsonify({'ok': True, 'message': 'No open position'}), 200
 
         price = float(data.get('price'))
+        CURRENT_PRICE = price
         side = CURRENT_POSITION['side']
         stop = float(CURRENT_POSITION['stop'])
         tp = float(CURRENT_POSITION['tp'])
